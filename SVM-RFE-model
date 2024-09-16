@@ -1,0 +1,45 @@
+# install.packages("e1071")
+#install.packages('caret')
+#BiocManager::install('sigFeature')
+# data preparation
+rm(list = ls())
+mydata <- read.csv('hot_gene.csv', row.names = 1)
+y <- as.matrix(mydata[,1])
+colnames(y) <- 'group'
+x <- as.matrix(mydata[,-1])
+
+# library package
+set.seed(1)
+library(e1071)
+library(caret)
+library(sigFeature)
+library(tidyverse)
+library(glmnet)
+library(VennDiagram)
+source("SVM-RFE.R")
+input <- mydata
+
+##5x cross validation
+svmRFE(input, k=5, halve.above = 100)
+nfold = 5 
+nrows = nrow(input)
+folds = rep(1:nfold, len=nrows)[sample(nrows)]
+folds = lapply(1:nfold, function(x) which(folds == x))
+results = lapply(folds, svmRFE.wrap, input, k=5, halve.above=100) 
+top.features = WriteFeatures(results, input, save=F)
+head(top.features)
+write.csv(top.features, 'feature_svm.csv')
+
+# Gene selection
+featsweep = lapply(1:39, FeatSweep.wrap, results, input)
+featsweep
+save(featsweep, file = 'featsweep.RData')
+no.info = min(prop.table(table(input[,1])))
+errors = sapply(featsweep, function(x) ifelse(is.null(x), NA, x$error))
+PlotErrors(errors, no.info)
+PlotAccuracy(1-errors, no.info)
+which.min(errors)
+top <- top.features[1:which.min(errors), 'FeatureName']
+top
+write.csv(top, 'SVM_RFE_hubgene.csv')
+dev.off()
