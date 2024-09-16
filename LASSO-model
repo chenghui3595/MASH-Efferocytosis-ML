@@ -1,0 +1,36 @@
+# data preparation
+rm(list = ls())
+options(stringsAsFactors = F)
+mydata <- read.csv('hot_gene.csv', row.names = 1)
+y <- as.matrix(mydata[,1])
+colnames(y) <- 'group'
+x <- as.matrix(mydata[,-1])
+
+# constrcution of lasso model
+library(glmnet)
+lasso_model <- glmnet(x, y, family = 'binomial', alpha = 1, nlambda = 100)
+print(lasso_model)
+plot(lasso_model, xvar = 'lambda', label = F, lwd=2)
+
+# 10x cross-validation
+cv_model <- cv.glmnet(x, y, family='binomial',type.measure = 'mse' , alpha=1, nfolds = 10)
+plot(cv_model, ylab='Binomial Mse')
+
+
+# selecting the best lambda value
+lambda_min <- cv_model$lambda.min
+lambda_min
+
+
+# gene selection
+coef_cv <- coef(lasso_model, s=lambda_min)
+coef_cv
+exp(coef_cv)
+coef_cv <- as.matrix(coef_cv)
+coef_cv <- as.data.frame(coef_cv)
+coef_cv$OR <- exp(coef_cv$s1)
+nonzero_vars <- rownames(coef_cv[coef_cv$OR != 1,])
+nonzero_vars <- nonzero_vars[2:8]
+nonzero_vars
+write.csv(nonzero_vars, 'lasso_hubgene.csv')
+dev.off()
